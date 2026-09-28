@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Player</title>
+<style>
+  :root{
+    --bg:#141019;
+    --panel:#1e1826;
+    --panel-edge:#2c2436;
+    --accent:#e0a458;
+    --accent-soft:#5a4a72;
+    --text:#f1ece4;
+    --text-dim:#9a90a8;
+    --track-bg:#332a44;
+  }
+  *{box-sizing:border-box;}
+  html,body{height:100%;}
+  body{
+    margin:0;
+    min-height:100%;
+    background:radial-gradient(circle at 30% 20%, #241c30, var(--bg) 60%);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    font-family:Georgia, 'Times New Roman', serif;
+    color:var(--text);
+    padding-top:env(safe-area-inset-top,0px);
+    padding-bottom:env(safe-area-inset-bottom,0px);
+  }
+  .player{
+    width:340px;
+    max-width:92vw;
+    background:var(--panel);
+    border-radius:18px;
+    padding:28px 26px 22px;
+    box-shadow:0 30px 70px rgba(0,0,0,.55), inset 0 0 0 1px var(--panel-edge);
+  }
+  .art{
+    width:100%;
+    aspect-ratio:1;
+    border-radius:14px;
+    background: conic-gradient(from 180deg, #3a2f4d, #221b2c, #3a2f4d);
+    position:relative;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    margin-bottom:20px;
+    overflow:hidden;
+  }
+  .art::before{
+    content:'';
+    position:absolute;
+    width:120%;
+    height:120%;
+    background:repeating-radial-gradient(circle, rgba(224,164,88,.06) 0 2px, transparent 2px 6px);
+    animation:spin 14s linear infinite;
+    animation-play-state:paused;
+  }
+  .art.playing::before{ animation-play-state:running; }
+  .disc{
+    width:44%;
+    aspect-ratio:1;
+    border-radius:50%;
+    background:radial-gradient(circle, #0d0a12 0 18%, #1c1626 19% 60%, #0d0a12 61%);
+    box-shadow:0 0 0 3px rgba(224,164,88,.25);
+    animation:spin 6s linear infinite;
+    animation-play-state:paused;
+  }
+  .art.playing .disc{ animation-play-state:running; }
+  @keyframes spin{ to{ transform:rotate(360deg); } }
+
+  .meta{ text-align:center; margin-bottom:18px; }
+  .title{ font-size:19px; margin:0 0 4px; }
+  .artist{ font-size:13px; color:var(--text-dim); margin:0; font-family:system-ui, sans-serif; }
+
+  .progress-row{
+    display:flex; align-items:center; gap:8px;
+    font-size:11px; color:var(--text-dim);
+    font-family:system-ui, sans-serif;
+    margin-bottom:16px;
+  }
+  input[type=range]{
+    -webkit-appearance:none; appearance:none;
+    flex:1; height:4px; border-radius:2px;
+    background:var(--track-bg);
+    outline:none;
+  }
+  input[type=range]::-webkit-slider-thumb{
+    -webkit-appearance:none; appearance:none;
+    width:12px; height:12px; border-radius:50%;
+    background:var(--accent); cursor:pointer;
+    box-shadow:0 0 0 4px rgba(224,164,88,.15);
+  }
+  input[type=range]::-moz-range-thumb{
+    width:12px; height:12px; border-radius:50%; border:none;
+    background:var(--accent); cursor:pointer;
+  }
+  #seek{ accent-color:var(--accent); }
+
+  .controls{
+    display:flex; align-items:center; justify-content:center; gap:22px;
+    margin-bottom:18px;
+  }
+  .ctrl-btn{
+    background:none; border:none; color:var(--text); cursor:pointer;
+    padding:6px; border-radius:50%;
+  }
+  .ctrl-btn:focus-visible{ outline:2px solid var(--accent); outline-offset:2px; }
+  .ctrl-btn svg{ width:20px; height:20px; fill:var(--text); }
+  .play-btn{
+    width:54px; height:54px; border-radius:50%;
+    background:var(--accent); display:flex; align-items:center; justify-content:center;
+  }
+  .play-btn svg{ width:22px; height:22px; fill:#211a2c; }
+
+  .bottom-row{
+    display:flex; align-items:center; justify-content:space-between; gap:14px;
+  }
+  .vol-row{ display:flex; align-items:center; gap:8px; flex:1; }
+  .vol-row svg{ width:16px; height:16px; fill:var(--text-dim); flex-shrink:0; }
+  #vol{ height:3px; }
+
+  .auto-label{
+    display:flex; align-items:center; gap:6px;
+    font-size:11px; color:var(--text-dim); font-family:system-ui, sans-serif;
+    white-space:nowrap;
+  }
+  .auto-label input{ accent-color:var(--accent); }
+
+  .playlist{
+    margin-top:20px; border-top:1px solid var(--panel-edge); padding-top:14px;
+    font-family:system-ui, sans-serif;
+  }
+  .track-row{
+    display:flex; justify-content:space-between; align-items:center;
+    padding:8px 6px; border-radius:8px; cursor:pointer; font-size:13px;
+  }
+  .track-row:hover{ background:rgba(255,255,255,.04); }
+  .track-row.active{ color:var(--accent); }
+  .track-row span.dur{ color:var(--text-dim); font-size:11px; }
+</style>
+</head>
+<body>
+<div class="player">
+  <div class="art" id="art"><div class="disc"></div></div>
+  <div class="meta">
+    <p class="title" id="title">—</p>
+    <p class="artist" id="artist">—</p>
+  </div>
+
+  <div class="progress-row">
+    <span id="curTime">0:00</span>
+    <input type="range" id="seek" min="0" max="100" value="0" step="0.1" aria-label="Seek">
+    <span id="durTime">0:00</span>
+  </div>
+
+  <div class="controls">
+    <button class="ctrl-btn" id="prevBtn" aria-label="Previous">
+      <svg viewBox="0 0 24 24"><path d="M6 6h2v12H6zm3.5 6 8.5 6V6z"/></svg>
+    </button>
+    <button class="ctrl-btn play-btn" id="playBtn" aria-label="Play">
+      <svg id="playIcon" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+    </button>
+    <button class="ctrl-btn" id="nextBtn" aria-label="Next">
+      <svg viewBox="0 0 24 24"><path d="M16 6h2v12h-2zM6 6l8.5 6L6 18z"/></svg>
+    </button>
+  </div>
+
+  <div class="bottom-row">
+    <div class="vol-row">
+      <svg viewBox="0 0 24 24"><path d="M3 10v4h4l5 5V5L7 10H3zm13.5 2a4.5 4.5 0 0 0-2.5-4v8a4.5 4.5 0 0 0 2.5-4z"/></svg>
+      <input type="range" id="vol" min="0" max="1" step="0.01" value="0.6" aria-label="Volume">
+    </div>
+    <label class="auto-label"><input type="checkbox" id="autoplay" checked> Autoplay</label>
+  </div>
+
+  <div class="playlist" id="playlist"></div>
+</div>
+
+<script>
+(function(){
+  // Each track is a short generated melody (frequencies in Hz, beat length in seconds)
+  const tracks = [
+    { title:'Amber Light', artist:'Study Loop', tempo:0.42,
+      notes:[261.6,329.6,392.0,329.6,440.0,392.0,329.6,293.7, 261.6,329.6,392.0,440.0,493.9,440.0,392.0,329.6] },
+    { title:'Late Train', artist:'Study Loop', tempo:0.36,
+      notes:[220.0,246.9,261.6,246.9,220.0,196.0,220.0,246.9, 293.7,329.6,293.7,261.6,246.9,220.0,196.0,220.0] },
+    { title:'Paper Moon', artist:'Study Loop', tempo:0.5,
+      notes:[349.2,392.0,440.0,392.0,349.2,293.7,329.6,349.2, 440.0,493.9,523.3,493.9,440.0,392.0,349.2,329.6] }
+  ];
+
+  const els = {
+    title: document.getElementById('title'),
+    artist: document.getElementById('artist'),
+    art: document.getElementById('art'),
+    playBtn: document.getElementById('playBtn'),
+    playIcon: document.getElementById('playIcon'),
+    prevBtn: document.getElementById('prevBtn'),
+    nextBtn: document.getElementById('nextBtn'),
+    seek: document.getElementById('seek'),
+    cur: document.getElementById('curTime'),
+    dur: document.getElementById('durTime'),
+    vol: document.getElementById('vol'),
+    autoplay: document.getElementById('autoplay'),
+    playlist: document.getElementById('playlist')
+  };
+
+  const ICON_PLAY = '<path d="M8 5v14l11-7z"/>';
+  const ICON_PAUSE = '<path d="M6 5h4v14H6zm8 0h4v14h-4z"/>';
+
+  let ctx = null;
+  let gainNode = null;
+  let idx = 0;
+  let playing = false;
+  let startedAt = 0;      // ctx time when current playback segment started
+  let elapsedBefore = 0;  // seconds already elapsed before this segment
+  let scheduledNodes = [];
+  let rafId = null;
+
+  function duration(track){ return track.notes.length * track.tempo; }
+  function fmtTime(s){
+    s = Math.max(0, s|0);
+    return Math.floor(s/60) + ':' + String(s%60).padStart(2,'0');
+  }
+
+  function ensureCtx(){
+    if (!ctx){
+      ctx = new (window.AudioContext || window.webkitAudioContext)();
+      gainNode = ctx.createGain();
+      gainNode.gain.value = parseFloat(els.vol.value);
+      gainNode.connect(ctx.destination);
+    }
+  }
+
+  function clearScheduled(){
+    scheduledNodes.forEach(n => { try{ n.stop(); }catch(e){} });
+    scheduledNodes = [];
+  }
+
+  function scheduleTrack(track, offset){
+    clearScheduled();
+    const now = ctx.currentTime;
+    let t = 0;
+    track.notes.forEach((freq) => {
+      const noteStart = t;
+      const noteEnd = t + track.tempo;
+      if (noteEnd > offset){
+        const osc = ctx.createOscillator();
+        const env = ctx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.value = freq;
+        osc.connect(env);
+        env.connect(gainNode);
+        const playAt = now + Math.max(0, noteStart - offset);
+        const noteDur = noteEnd - Math.max(noteStart, offset);
+        env.gain.setValueAtTime(0, playAt);
+        env.gain.linearRampToValueAtTime(0.28, playAt + 0.02);
+        env.gain.linearRampToValueAtTime(0, playAt + noteDur * 0.95);
+        osc.start(playAt);
+        osc.stop(playAt + noteDur);
+        scheduledNodes.push(osc);
+      }
+      t = noteEnd;
+    });
+  }
+
+  function loadTrack(i, autoplayNow){
+    idx = (i + tracks.length) % tracks.length;
+    const track = tracks[idx];
+    els.title.textContent = track.title;
+    els.artist.textContent = track.artist;
+    els.dur.textContent = fmtTime(duration(track));
+    els.seek.max = duration(track);
+    els.seek.value = 0;
+    els.cur.textContent = '0:00';
+    elapsedBefore = 0;
+    renderPlaylist();
+    if (autoplayNow) play(); else pause();
+  }
+
+  function play(){
+    ensureCtx();
+    if (ctx.state === 'suspended') ctx.resume();
+    const track = tracks[idx];
+    scheduleTrack(track, elapsedBefore);
+    startedAt = ctx.currentTime;
+    playing = true;
+    els.playIcon.innerHTML = ICON_PAUSE;
+    els.art.classList.add('playing');
+    tick();
+  }
+
+  function pause(){
+    if (ctx){
+      elapsedBefore = elapsedBefore + (ctx.currentTime - startedAt);
+      clearScheduled();
+    }
+    playing = false;
+    els.playIcon.innerHTML = ICON_PLAY;
+    els.art.classList.remove('playing');
+    cancelAnimationFrame(rafId);
+  }
+
+  function tick(){
+    if (!playing) return;
+    const track = tracks[idx];
+    const elapsed = elapsedBefore + (ctx.currentTime - startedAt);
+    if (elapsed >= duration(track)){
+      handleTrackEnd();
+      return;
+    }
+    els.seek.value = elapsed;
+    els.cur.textContent = fmtTime(elapsed);
+    rafId = requestAnimationFrame(tick);
+  }
+
+  function handleTrackEnd(){
+    pause();
+    elapsedBefore = 0;
+    els.seek.value = 0;
+    els.cur.textContent = '0:00';
+    if (els.autoplay.checked){
+      loadTrack(idx + 1, true);
+    }
+  }
+
+  function seekTo(seconds){
+    const wasPlaying = playing;
+    if (playing) pause();
+    elapsedBefore = Math.min(Math.max(0, seconds), duration(tracks[idx]));
+    els.cur.textContent = fmtTime(elapsedBefore);
+    if (wasPlaying) play();
+  }
+
+  function renderPlaylist(){
+    els.playlist.innerHTML = '';
+    tracks.forEach((t, i) => {
+      const row = document.createElement('div');
+      row.className = 'track-row' + (i === idx ? ' active' : '');
+      row.innerHTML = `<span>${t.title}</span><span class="dur">${fmtTime(duration(t))}</span>`;
+      row.addEventListener('click', () => loadTrack(i, true));
+      els.playlist.appendChild(row);
+    });
+  }
+
+  els.playBtn.addEventListener('click', () => { playing ? pause() : play(); });
+  els.prevBtn.addEventListener('click', () => loadTrack(idx - 1, true));
+  els.nextBtn.addEventListener('click', () => loadTrack(idx + 1, true));
+  els.seek.addEventListener('input', () => { els.cur.textContent = fmtTime(parseFloat(els.seek.value)); });
+  els.seek.addEventListener('change', () => seekTo(parseFloat(els.seek.value)));
+  els.vol.addEventListener('input', () => { if (gainNode) gainNode.gain.value = parseFloat(els.vol.value); });
+
+  loadTrack(0, false);
+})();
+</script>
+</body>
+</html>
